@@ -84,7 +84,7 @@ export class Form extends LitElement{
 
 		return html`
 			<div class="container" @keydown=${this.keyPress}>
-        <input id="user" type="text"  placeholder="aur name" autofocus>
+        <input id="user" type="text"  placeholder="ur name" autofocus>
 				${buttonOrError}
 			</div>
 		`;

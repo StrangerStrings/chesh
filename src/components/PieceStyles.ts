@@ -140,15 +140,4 @@ export const pieceStyles = css`
   .pinged.isInCheck .king .secondary {
     animation: check2 0.4s ease-out
   }
-
-  .checkM8 .king {
-    height: 200%;
-    width: 200%;
-  }
-
-  .checkM8 .king .secondary{
-    height: 80%;
-    width: 80%;
-  }
-
 `;

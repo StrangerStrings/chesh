@@ -5,6 +5,7 @@ import './components/Game';
 import './components/Square';
 import './components/Start';
 import './components/Lobby';
+import './components/Restart';
 
 import * as fs from 'firebase/firestore';// Import the functions you need from the SDKs you need
 import * as fb from "firebase/app";
@@ -27,18 +28,12 @@ const active = "activeUsers"
 export type User = {
 	name:  string;
 	lastOnline: number;
-	challengedBy?: string;
+	challenging?: string;
 }
 
-const refreshRate = 1000 * 2
-const userTimeout = 1000 * 1000
+const refreshRate = 1000 * 20
+// const userTimeout = 1000 * 1000
 
-
-const centreSquare = (board: ISquare[]): ISquare => {
-	return board.find(sq => 
-		sq.x == 4 && sq.y == 4	
-	)
-}
 
 @customElement('whole-page')
 /**
@@ -62,6 +57,12 @@ export class WholePage extends LitElement {
 				height: 95vh;
 				width: 95vh;
 			}
+
+			win-lose {
+				position: absolute;
+				height: 100%;
+				width: 100%;
+			}
 		`
 	];
 
@@ -70,19 +71,20 @@ export class WholePage extends LitElement {
 	game?: DocumentReference<DocumentData>;
 	activeUsersDoc?: DocumentReference<DocumentData>;
 	
-	activeUsersUnsubscribe: Unsubscribe
-	scheduleLobby: NodeJS.Timeout;
+	activeUsersInterval: NodeJS.Timeout;
+	activeUsersUnsubscribe: Unsubscribe;
 
 	@internalProperty() lobby: boolean = false;
 	@internalProperty() playing: boolean = false;
 
-	@internalProperty() currentUser: string;
+	@internalProperty() currentUser: User;
 	
 	@internalProperty() activeUsers: User[] = []
 	@internalProperty() boardData?: ISquare[];
 	@internalProperty() turn?: Color;
 	
 	@internalProperty() color?: Color;
+	@internalProperty() lost?: Color;
 
 
 	async connectedCallback() {
@@ -94,28 +96,11 @@ export class WholePage extends LitElement {
 		this.activeUsersDoc = fs.doc(this.db, users, active)
 	}
 
-	// subscribe to changes..
-	// AND set a timer updating the time. Easy.
-
-
-
-	challenge(ev: CustomEvent) {
-		const userToChallenge = this.activeUsers.find(user => 
-			user.name == ev.detail
-		); 
-		userToChallenge.challengedBy = this.currentUser;
-
-		fs.setDoc(this.activeUsersDoc, {all: this.activeUsers})
-	}
-
-
-	async addUser(ev: CustomEvent) {
+	async addUser(ev: CustomEvent<string>) {
 		const userName = ev.detail;
 
 		const activeUsers = (await fs.getDoc(this.activeUsersDoc)).data().all as User[];
 
-		console.log(activeUsers);
-		
 		const userNames = activeUsers.map(u => u.name);
 		if (userNames.includes(userName)) {
 			const start = this.shadowRoot.querySelector<Form>('user-form');
@@ -128,116 +113,177 @@ export class WholePage extends LitElement {
 		const user: User = {
 			name: userName,
 			lastOnline: Date.now()
-		}
+		};
 
-		// subscribe
-
-		this.scheduleLobby = setInterval(async () => {
-			await this.filterActiveUsers()
-			await this.tryCreateGame()
-		}, refreshRate)
-
-		
-		const plusNewUser = [...activeUsers, user]
+		const plusNewUser = [...activeUsers, user];
 		
 		fs.setDoc(this.activeUsersDoc, {all: plusNewUser})
 		
-		
-		this.activeUsers = plusNewUser
-		this.currentUser = userName;
-		this.lobby = true
+		this.activeUsers = plusNewUser;
+		this.currentUser = user;
+		this.lobby = true;
+
+		this.removeInactiveUsers();
+		this.activeUsersInterval = setInterval(
+			this.removeInactiveUsers.bind(this), refreshRate
+		);
+
+		this.activeUsersUnsubscribe = fs.onSnapshot(this.activeUsersDoc, (doc) => {
+			console.log('snapshotta');
+			
+			this.activeUsers = doc.data().all;
+			this.tryCreateGame();
+		});
 	}
 
 
+	async removeInactiveUsers() {
+		const activeUsersDocDoc = await fs.getDoc(this.activeUsersDoc);
 
+		this.currentUser.lastOnline = Date.now();
 
-	async filterActiveUsers() {
-		const activeUsersDocDoc = await fs.getDoc(this.activeUsersDoc)
+		// remove current user, re-add with updated .lastOnline and sort alphabetically
+		let activeUsers = activeUsersDocDoc.data().all as User[];
+		activeUsers = activeUsers.filter(u => u.name !== this.currentUser.name);
 
-		const activeUsers = activeUsersDocDoc.data().all as User[]
+		activeUsers.push(this.currentUser);
 
+		activeUsers = activeUsers.sort((a,b) => {
+			return a.name.toUpperCase().localeCompare(b.name.toUpperCase());
+		});
+
+		// filter out user who were last online too long ago and set firebase document
 		const onlineUsers = activeUsers.filter(user => {
-			const thirtySecondsAgo = Date.now() - userTimeout
-			return user.lastOnline > thirtySecondsAgo
+			const inactiveDeadline = Date.now() - refreshRate * 2;
+			return user.lastOnline > inactiveDeadline;
 		})
 
 		this.activeUsers = onlineUsers
-
 		fs.setDoc(this.activeUsersDoc, {all: onlineUsers})
 
-		console.log(this.activeUsers);
+		console.log(onlineUsers);
+	}
+
+
+	challenge(ev: CustomEvent) {
+		this.currentUser.challenging = ev.detail;
+
+		this.activeUsers.find(u => u.name == this.currentUser.name).challenging = ev.detail;
+
+		fs.setDoc(this.activeUsersDoc, {all: this.activeUsers})
 	}
 
 
 
 	// new game stuff
 	async tryCreateGame() {
-		const currentUser = this.activeUsers.find(u => u.name == this.currentUser);
-		if (!currentUser?.challengedBy) {
+		if (!this.currentUser.challenging) {
 			return;
 		}
 
-		const challengedBy = this.activeUsers.find(u => u.name == currentUser.challengedBy);
-		if (challengedBy?.challengedBy != currentUser.name) {
-			return;
-		}
+		const challengers = this.activeUsers.filter(u => u.challenging == this.currentUser.name);
 
-		await this.gameOn(currentUser, challengedBy)
+		for (let i=0; i<challengers.length; i++) {
+			const challenger = challengers[i];
+			const areChallengingEachOther = 
+					challenger.challenging == this.currentUser.name 
+					&& this.currentUser.challenging == challenger.name;
+			if (areChallengingEachOther) {
+				this.gameOn(challenger)
+				return;
+			}
+		}
 	}
 	
-	async gameOn(player1: User, player2: User) {
-		const gameName = this.computeGameName(player1, player2);
-		this.color = gameName.startsWith(this.currentUser) ? 'white' : 'black'
+	async gameOn(challenger: User) {
+		const gameName = this.computeGameName([this.currentUser.name, challenger.name]);
+		this.color = gameName.startsWith(this.currentUser.name) ? 'white' : 'black'
 		console.log('theres a game on! ',gameName, ' ', this.color);
 
 		this.game = fs.doc(this.db, boards, gameName);
 		const gameDoc = await fs.getDoc(this.game);
-
-		// console.log(gameDoc.data());
 		
 		if (!gameDoc.data()) {
-			this.color = 'white'
 			this.boardData = setupBoard()
 			await fs.setDoc(this.game, {
 				board: JSON.stringify(this.boardData),
-				turn: this.color
+				turn: 'white'
 			})
 		}
 
 		const unsub = fs.onSnapshot(this.game, (doc) => {
 			// console.log("Current data: ", doc.data().board);
+			this.lost = doc.data().lost
 			this.turn = doc.data().turn
 			this.boardData = JSON.parse(doc.data().board);
-			console.log(this.turn);
 		});
 
-		clearInterval(this.scheduleLobby)
+		clearInterval(this.activeUsersInterval)
+		this.activeUsersUnsubscribe()
 		this.playing = true;
 	}
 
-	computeGameName(player1: User, player2: User): string {
-		const alphabetical = [player1, player2].sort((a, b) => {
-			const nameA = a.name.toUpperCase();
-			const nameB = b.name.toUpperCase();
-			return nameA.localeCompare(nameB);
+	computeGameName(players: string[]): string {
+		const alphabetical = players.sort((a, b) => {
+			return a.toUpperCase().localeCompare(b.toUpperCase());
 		})
 
-		return alphabetical.map(i => i.name).join('');
+		return alphabetical.join('');
 	}
-	// new game stuff
 
 
-
-
-
-	async testMove() {
-		const board = this.shadowRoot.querySelector<Game>('the-game').board
-		console.log(centreSquare(board.squares));
-
+	async pieceMoved() {
+		const board = this.shadowRoot.querySelector<Game>('the-game').board;
 		
-		await fs.setDoc(this.game, {
+		console.log(board.lost);
+		if (board.lost) {
+			
+			this.lost = board.lost
+			console.log(this.lost);
+			
+		}
+
+		const game = {
 			board: JSON.stringify(board.squares),
 			turn: board.turn
+		}
+		if (board.lost) {
+			game['lost'] = board.lost
+		}
+
+		fs.setDoc(this.game, game);
+	}
+
+	async restart() {
+		this.lost = undefined;
+		this.color = undefined;
+		this.playing = false;
+
+		delete this.currentUser.challenging;
+
+		const activeUsersDocDoc = await fs.getDoc(this.activeUsersDoc);
+
+		let activeUsers = activeUsersDocDoc.data().all as User[];
+		activeUsers = activeUsers.filter(u => u.name !== this.currentUser.name);
+
+		activeUsers.push(this.currentUser);
+
+		activeUsers = activeUsers.sort((a,b) => {
+			return a.name.toUpperCase().localeCompare(b.name.toUpperCase());
+		});
+
+		console.log('adding user');
+		fs.setDoc(this.activeUsersDoc, {all: this.activeUsers})
+	
+		this.removeInactiveUsers();
+		this.activeUsersInterval = setInterval(
+			this.removeInactiveUsers.bind(this), refreshRate
+		);
+
+		console.log('setting snapshot');
+		this.activeUsersUnsubscribe = fs.onSnapshot(this.activeUsersDoc, (doc) => {
+			this.activeUsers = doc.data().all;
+			this.tryCreateGame();
 		});
 	}
 
@@ -248,15 +294,15 @@ export class WholePage extends LitElement {
 					color=${this.color}
 					turn=${this.turn}
 					.boardData=${this.boardData}
-					@test=${this.testMove}
+					@piece-moved=${this.pieceMoved}
 				></the-game>`
 		}
 		else if (this.lobby) {
 			return html`
 				<the-lobby 
 					.users=${this.activeUsers} 
-					currentUser=${this.currentUser} 
-					@challenge=${this.challenge}
+					.currentUser=${this.currentUser} 
+					@challenge=${this.challenge} 
 				></the-lobby>`
 		}
 		else {
@@ -267,10 +313,23 @@ export class WholePage extends LitElement {
 		}
 	}
 
+	renderWinLose() {
+		if (this.lost) {
+			return html`
+				<win-lose
+					lost=${this.lost}
+					color=${this.color}
+					.currentUser=${this.currentUser}
+					@restart=${this.restart}
+				></win-lose>`;
+		}
+	}
+
 	render() {
 		return html`
 			<div class="container">
 				${this.renderContent()}
+				${this.renderWinLose()}
 			</div>
 		`;
 	}

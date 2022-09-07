@@ -59,6 +59,14 @@ export class Square extends LitElement{
         height: 97%;
         width: 97%;
       }
+      .loser .inner {
+        height: 50%;
+        width: 50%;
+      }
+      .winner .inner {
+        height: 110%;
+        width: 110%;
+      }
       .checkM8 .inner {
         height: 50%;
         width: 50%;
@@ -75,6 +83,8 @@ export class Square extends LitElement{
 	@property({type: Boolean}) canMoveHere: boolean;
 	@property({type: Boolean}) currentlySelected: boolean;
 	@property({type: Boolean}) isInCheck: boolean;
+	@property({type: Boolean}) loser: boolean;
+	@property({type: Boolean}) winner: boolean;
 	@property({type: Boolean}) checkM8: boolean;
 	@property({type: Boolean}) canBeMoved: boolean = false;
 
@@ -140,9 +150,14 @@ export class Square extends LitElement{
       classes.push('isInCheck')
     }
 
+    if (this.loser) {
+      classes.push('loser')
+    }
+    if (this.winner) {
+      classes.push('winner')
+    }
+
     if (this.checkM8) {
-      console.log('checkm7class');
-      
       classes.push('checkM8')
     }
     if (this.currentlySelected) {

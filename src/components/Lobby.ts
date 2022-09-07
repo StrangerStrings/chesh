@@ -72,11 +72,7 @@ export class Lobby extends LitElement{
 		{name: 'frank', lastOnline: 1},
 		{name: 'betty', lastOnline: 1},
 	];
-  @property({type: String}) currentUser: string = "";
-
-	get current (): User {
-		return this.users.find(u => u.name == this.currentUser)
-	}
+  @property({type: Object}) currentUser: User;
 
   addUser() {
     const input = this.shadowRoot.querySelector<HTMLInputElement>('#user')
@@ -85,10 +81,8 @@ export class Lobby extends LitElement{
   }
 
 	challenge(user: User) {
+		// need to change these two events maybe to match outer event handler
 		this.dispatchEvent(new CustomEvent('challenge', {detail: user.name}))
-	}
-	accepted(challengedBy: string) {
-		this.dispatchEvent(new CustomEvent('challenge', {detail: challengedBy}))
 	}
 
 	renderAcceptChallenge(user: User): TemplateResult {
@@ -101,11 +95,11 @@ export class Lobby extends LitElement{
 	}
 
   renderUser(user: User): TemplateResult {
-		if (this.current.challengedBy == user.name) {
+		if (user.challenging == this.currentUser.name) {
 			return this.renderAcceptChallenge(user)
 		}
 
-		const challengingBool = user.challengedBy == this.current.name
+		const challengingBool = this.currentUser.challenging == user.name 
 		
 		const classes = challengingBool ? "user challenge" : "user";
 		const tooltip = challengingBool ? "" : "Challenge";
@@ -126,7 +120,7 @@ export class Lobby extends LitElement{
   }
 
 	render() {
-		const otherUsers = this.users.filter(u => u.name !== this.currentUser)
+		const otherUsers = this.users.filter(u => u.name !== this.currentUser.name)
 		
 		if (!otherUsers.length) {
 			return html`

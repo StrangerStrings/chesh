@@ -25,6 +25,7 @@ export class Board {
   width: number = 8;
 
   turn: Color = "white"
+  lost?: Color;
 
   get largestDimension() { 
     return Math.max(this.height, this.width); 
@@ -205,11 +206,10 @@ export class Board {
   }
 
   checkM8(color: Color) {
-    const losers = this.squares.filter(i => i.color == color)
-    console.log(losers);
+    this.lost = color
     
+    const losers = this.squares.filter(i => i.color == color)
     losers.forEach(i => i.checkM8 = true)
-    console.log(losers);
   }
 
 

@@ -56,10 +56,7 @@ export class Game extends LitElement{
 
 	protected updated(change: Map<string | number | symbol, unknown>): void {
 		if (change.has('boardData')) {
-			console.log('board has changed');
 			this.board = new Board(this.boardData, this.turn)
-			
-			console.log(centreSquare(this.board.squares));
 			this.requestUpdate();
 		}
 	}
@@ -84,7 +81,7 @@ export class Game extends LitElement{
 		
 		this.requestUpdate();
 
-		this.dispatchEvent(new Event('test'));
+		this.dispatchEvent(new Event('piece-moved'));
 	}
 
 	nextTurn() {
@@ -100,6 +97,14 @@ export class Game extends LitElement{
 				|| (this.pieceSelected && square.piece == undefined);
 		const canBeMoved = playersTurn && couldBeMoved;
 
+		// lost = true/false/undefined
+		let lost = this.board.lost ? 
+			(square.color == this.board.lost ? true : false)
+			: undefined;
+
+			console.log(this.board.lost);
+			
+
 		return html`
 			<a-square 
 				@startMove=${this.onStartMove}
@@ -112,6 +117,8 @@ export class Game extends LitElement{
 				?currentlySelected=${square.currentlySelected}
 				?isInCheck=${square.isInCheck}
 				?checkM8=${square.checkM8}
+				?loser=${lost == true}
+				?winner=${lost == false}
 				?canBeMoved=${canBeMoved}
 			></a-square>`;
 	}

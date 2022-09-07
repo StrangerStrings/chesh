@@ -221,7 +221,7 @@ export class Board {
   }
 
   pawnDoneGood(square: ISquare): boolean {
-    if (square.piece == 'pawn' && (square.y == 0 || square.y == this.height)) {
+    if (square.piece == 'pawn' && (square.y == 1 || square.y == this.height)) {
       return true;
     }
   }

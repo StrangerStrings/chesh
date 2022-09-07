@@ -70,6 +70,7 @@ export class Game extends LitElement{
 		const hasMoved = this.board.moveHere(ev.detail.x, ev.detail.y);
 		if (hasMoved) {
 			this.nextTurn();
+			this.dispatchEvent(new Event('piece-moved'));
 		} else {
 			const king = this.board.getKing(this.board.turn)
 			const cmps = this.shadowRoot.querySelectorAll<Square>('a-square')
@@ -80,8 +81,6 @@ export class Game extends LitElement{
 		}
 		
 		this.requestUpdate();
-
-		this.dispatchEvent(new Event('piece-moved'));
 	}
 
 	nextTurn() {

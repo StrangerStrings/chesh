@@ -156,7 +156,7 @@ export const pawnMoves = (square: ISquare, board: Board, onlyAttacks?: boolean):
 
   const isFirstMove =  isPawnsFirstMove(square, board.height);
   const secondSquare = board.getSquare(square.x, square.y + (2*forward)) 
-  if (secondSquare.piece || !isFirstMove) {
+  if (!secondSquare || secondSquare.piece || !isFirstMove) {
     return moves
   }
   moves.push({x: secondSquare.x, y: secondSquare.y})

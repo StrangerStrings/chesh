@@ -56,6 +56,8 @@ export class WholePage extends LitElement {
 			the-game {
 				height: 95vh;
 				width: 95vh;
+				max-height: 95vw;
+				margin: 2vw;
 			}
 
 			win-lose {

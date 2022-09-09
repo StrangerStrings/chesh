@@ -22,7 +22,7 @@ export class Square extends LitElement{
 				height: 100%;
 				width: 100%;
 				background: #f599a6;
-				border: solid 1.1vh transparent;
+				border: min(1.1vh, 0.8vw) solid transparent;
         transition: border 0.15s ease;
 			}
       .even {

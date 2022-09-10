@@ -10,7 +10,7 @@ import './components/Restart';
 import * as fs from 'firebase/firestore';// Import the functions you need from the SDKs you need
 import * as fb from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { DocumentData, DocumentReference, Timestamp, Unsubscribe } from "firebase/firestore";
+import { DocumentData, DocumentReference, Unsubscribe } from "firebase/firestore";
 import { Board, Color, ISquare } from "./lib/Board";
 import { firebaseConfig } from "./firebaseConfig";
 import { setupBoard } from "./lib/BoardSetup";
@@ -29,6 +29,7 @@ export type User = {
 	name:  string;
 	lastOnline: number;
 	challenging?: string;
+	playing: boolean;
 }
 
 const refreshRate = 1000 * 20
@@ -75,6 +76,7 @@ export class WholePage extends LitElement {
 	
 	activeUsersInterval: NodeJS.Timeout;
 	activeUsersUnsubscribe: Unsubscribe;
+	gameUnsubscribe: Unsubscribe;
 
 	@internalProperty() lobby: boolean = false;
 	@internalProperty() playing: boolean = false;
@@ -114,7 +116,8 @@ export class WholePage extends LitElement {
 
 		const user: User = {
 			name: userName,
-			lastOnline: Date.now()
+			lastOnline: Date.now(),
+			playing: false
 		};
 
 		const plusNewUser = [...activeUsers, user];
@@ -198,6 +201,30 @@ export class WholePage extends LitElement {
 	}
 	
 	async gameOn(challenger: User) {
+		// garbage collect old games
+		const allBoards = await fs.getDocs(fs.collection(this.db, 'boards'));
+		allBoards.forEach(board => {
+			// try do something where i compare the two arrays
+			// to check if one contains all the other
+			// eg a.every(i => b.includes(i))
+			// const userNames = this.activeUsers.map(u => u.name);
+			// const twoUserNames = board.id.split('-');
+
+			let userNamesInBoardId = 0;
+			this.activeUsers.forEach((user) => {
+				if (board.id.includes(user.name)) {
+					userNamesInBoardId++;
+				}
+			});
+
+			if (userNamesInBoardId < 2) {
+				const document = fs.doc(this.db, boards, board.id)
+				fs.deleteDoc(document)
+			}
+		});
+
+
+
 		const gameName = this.computeGameName([this.currentUser.name, challenger.name]);
 		this.color = gameName.startsWith(this.currentUser.name) ? 'white' : 'black'
 		console.log('theres a game on! ',gameName, ' ', this.color);
@@ -213,14 +240,24 @@ export class WholePage extends LitElement {
 			})
 		}
 
-		const unsub = fs.onSnapshot(this.game, (doc) => {
-			// console.log("Current data: ", doc.data().board);
+		this.gameUnsubscribe = fs.onSnapshot(this.game, (doc) => {
+			if (!doc.data()) {
+				return;
+			}
 			this.lost = doc.data().lost
 			this.turn = doc.data().turn
 			this.boardData = JSON.parse(doc.data().board);
+			
+			if (this.lost) {
+				this.gameUnsubscribe()
+			}
 		});
 
-		clearInterval(this.activeUsersInterval)
+		this.currentUser.playing = true;
+		this.activeUsers.find(u => u.name == this.currentUser.name).playing = true;
+		fs.setDoc(this.activeUsersDoc, {all: this.activeUsers})
+
+		// clearInterval(this.activeUsersInterval)
 		this.activeUsersUnsubscribe()
 		this.playing = true;
 	}
@@ -230,7 +267,7 @@ export class WholePage extends LitElement {
 			return a.toUpperCase().localeCompare(b.toUpperCase());
 		})
 
-		return alphabetical.join('');
+		return alphabetical.join('-');
 	}
 
 
@@ -261,7 +298,10 @@ export class WholePage extends LitElement {
 		this.color = undefined;
 		this.playing = false;
 
+		fs.deleteDoc(this.game)
+
 		delete this.currentUser.challenging;
+		this.currentUser.playing = false;
 
 		const activeUsersDocDoc = await fs.getDoc(this.activeUsersDoc);
 
@@ -278,9 +318,9 @@ export class WholePage extends LitElement {
 		fs.setDoc(this.activeUsersDoc, {all: this.activeUsers})
 	
 		this.removeInactiveUsers();
-		this.activeUsersInterval = setInterval(
-			this.removeInactiveUsers.bind(this), refreshRate
-		);
+		// this.activeUsersInterval = setInterval(
+		// 	this.removeInactiveUsers.bind(this), refreshRate
+		// );
 
 		console.log('setting snapshot');
 		this.activeUsersUnsubscribe = fs.onSnapshot(this.activeUsersDoc, (doc) => {

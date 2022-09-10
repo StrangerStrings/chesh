@@ -66,12 +66,7 @@ export class Lobby extends LitElement{
 		`
 	];
 
-  @property({type: Array}) users: User[] = [
-		{name: 'bob', lastOnline: 1},
-		{name: 'timmy', lastOnline: 1},
-		{name: 'frank', lastOnline: 1},
-		{name: 'betty', lastOnline: 1},
-	];
+  @property({type: Array}) users: User[] = [];
   @property({type: Object}) currentUser: User;
 
   addUser() {
@@ -120,7 +115,9 @@ export class Lobby extends LitElement{
   }
 
 	render() {
-		const otherUsers = this.users.filter(u => u.name !== this.currentUser.name)
+		const otherUsers = this.users.filter(u => 
+			u.name !== this.currentUser.name && !u.playing
+		);
 		
 		if (!otherUsers.length) {
 			return html`

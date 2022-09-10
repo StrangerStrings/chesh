@@ -80,7 +80,6 @@ export class Board {
   moveHere(x:number, y:number): boolean {
     const moveTo = this.getSquare(x, y);
 		const moveFrom = this.currentlySelected();
-
     const colorMoving = moveFrom.color
 
     const color = moveTo.color
@@ -93,6 +92,7 @@ export class Board {
 		moveFrom.color = undefined ;
 
     if (this.isInCheck(colorMoving)) {
+      // reverse move
       moveFrom.piece = moveTo.piece;
       moveFrom.color = moveTo.color;
       

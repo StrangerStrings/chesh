@@ -3,6 +3,8 @@ import { defaultStyles } from "../defaultStyles";
 import { ISquare } from "../lib/Board";
 import { Position } from "../lib/PossibleMoves";
 import { pieceStyles } from "./PieceStyles";
+import { classMap, ClassInfo } from 'lit-html/directives/class-map';
+
 
 /**
  * Just one configurable component for use and reuse
@@ -18,6 +20,7 @@ export class Square extends LitElement{
         justify-content: center;
         align-items: center;
       }
+
 			.square {
 				height: 100%;
 				width: 100%;
@@ -28,24 +31,21 @@ export class Square extends LitElement{
       .even {
 				background: #fff0e1;
       }
+
+      .hasPiece.canBeMoved, .canMoveHere {
+        cursor: pointer;
+      }
       .canMoveHere {
-        border: solid 1.2vh #ea8555; 
 				border: solid 1vh #ffc192;
         border: 0.9vh solid rgb(255, 203, 164);
         padding: 0.2vh;
       }
       .canMoveHere.hasPiece {
-        border: solid 1.2vh #ffba92;
-				border: solid 1vh #ffc192;
         border: 1.1vh solid #ffb514;
         padding: 0;
       }
       .canMoveHere.hasPiece.even {
-				border: solid 1vh #ffc192;
         border: 1.1vh solid #ffc28a;
-      }
-      .hasPiece.canBeMoved, .canMoveHere {
-        cursor: pointer;
       }
 
       .inner {
@@ -59,13 +59,13 @@ export class Square extends LitElement{
         height: 97%;
         width: 97%;
       }
-      .loser .inner {
-        height: 50%;
-        width: 50%;
-      }
       .winner .inner {
         height: 110%;
         width: 110%;
+      }
+      .loser .inner {
+        height: 50%;
+        width: 50%;
       }
       .checkM8 .inner {
         height: 50%;
@@ -90,14 +90,15 @@ export class Square extends LitElement{
 
   @internalProperty() pinged: boolean = false;
 
+public ping() {
+    this.pinged = true
+    setTimeout(() => this.pinged = false, 400)
+  }
 
   private onClick() {
     if (this.canMoveHere) {
       this.moveHere()
-      return
-    }
-
-    if (this.canBeMoved) {
+    } else if (this.canBeMoved) {
       this.startMove()
     }
   }
@@ -126,74 +127,39 @@ export class Square extends LitElement{
     ))
 	}
 
-  public ping() {
-    console.log('pinged');
-    
-    this.pinged = true
-    setTimeout(() => this.pinged = false, 400)
-  }
-
-  computeSquareClasses(): string {
-    const classes = ['square']
-   
-    const even = (this.x+this.y)%2 == 0;
-    if (even) {
-      classes.push('even')
-    }
-    if (this.canBeMoved) {
-      classes.push('canBeMoved')
-    }
-    if (this.canMoveHere) {
-      classes.push('canMoveHere')
-    }
-    if (this.isInCheck) {
-      classes.push('isInCheck')
-    }
-
-    if (this.loser) {
-      classes.push('loser')
-    }
-    if (this.winner) {
-      classes.push('winner')
-    }
-
-    if (this.checkM8) {
-      classes.push('checkM8')
-    }
-    if (this.currentlySelected) {
-      classes.push('currentlySelected')
-    }
-    
-    if (this.piece) {
-      if (this.x == 8 && this.y == 6) {
-        console.log('hasPiece: ',this.piece);
-      }
-      classes.push('hasPiece')
-    }
-
-    if (this.pinged) {
-      classes.push('pinged')
-    }
-
-    return classes.join(' ');
-  }
-
   renderPiece() {
     if (!this.piece) {
       return html``
     }
 
-    const classes = ['piece', this.piece, this.color].join(' ');
+    const classes = {
+      piece: true,
+      [this.piece]: true,
+      [this.color]: true
+    };
     
-    return html`<div class=${classes}><div class="secondary"></div></div>`;
+    return html`<div class=${classMap(classes)}><div class="secondary"></div></div>`;
   }
 
 	render() {
-    const squareClasses = this.computeSquareClasses();
+    const squareClasses = {
+      square: true,
+      even: (this.x+this.y)%2 == 0,
+      hasPiece: this.piece,
+      canBeMoved: this.canBeMoved,
+      currentlySelected: this.currentlySelected,
+      canMoveHere: this.canMoveHere,
+      isInCheck: this.isInCheck,
+      checkM8: this.checkM8,
+      // loser: this.loser,
+      // winner: this.winner,
+      // probs swap checkM8 for winner and loser
+      pinged: this.pinged
+    }
     const piece = this.renderPiece()
 
 		return html`
-			<div class=${squareClasses} 
+			<div class=${classMap(squareClasses)} 
         @click=${this.onClick}>
         <div class="inner">
           ${piece}

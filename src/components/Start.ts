@@ -15,40 +15,39 @@ export class Form extends LitElement{
 		defaultStyles,
 		css`
 			.container {
-				width: 300px;
 				display: flex;
 				flex-direction: column;
+				width: 300px;
 				gap: 10px;
 			}
 
 			input {
+				background: #fcfdff;
 				padding: 9px;
+				outline: none;
 				border: solid #a0a5b1 1px;
 				border-radius: 5px;
-				outline: none;
-				text-align: center;
 				font-size: 110%;
-				background: #fcfdff;
+				text-align: center;
 			}
 			input:focus {
-				border: solid #a0a5b1 2px;
 				padding: 8px;
-				/* outline: none; */
+				border: solid #a0a5b1 2px;
 			}
 
 			.button {
+				background: #e3ebff;
 				padding: 6px;
-				background: #e3ebff;;
-				border-radius: 5px;
-				text-align: center;
-				font-size: 90%;
 				border: 1px solid #a0a5b1;
+				border-radius: 5px;
+				font-size: 90%;
+				text-align: center;
 				cursor: pointer;
 			}
 
 			.error {
-				font-size: 90%;
 				padding: 7px;
+				font-size: 90%;
 				text-align: center;
 				font-style: italic;
 			}
@@ -59,32 +58,30 @@ export class Form extends LitElement{
   @property({type: Boolean}) userNameTakenError: boolean = false;
 
 	keyPress(ev: KeyboardEvent) {
-		console.log(ev.key);
-		
 		this.userNameTakenError = false;
-		// this.userNameTakenError = !this.userNameTakenError;
+
 		if (ev.key == "Enter") {
-			this.addUser()
+			this.addUser();
 		}
 	}
 
   addUser() {
-    const input = this.shadowRoot.querySelector<HTMLInputElement>('#user')
-    const name = input.value.trim()
+    const input = this.shadowRoot.querySelector<HTMLInputElement>('#user');
+    const name = input.value.trim();
 		if (!name) {
 			return;
 		}
-    this.dispatchEvent(new CustomEvent('add-user', {detail: name}))
+    this.dispatchEvent(new CustomEvent('add-user', {detail: name}));
   }
 
 	render() {
 		const buttonOrError = !this.userNameTakenError ?
-			html`<div class="button" @click=${this.addUser}>Find Game</button>`:
+			html`<div class="button" @click=${this.addUser}>Find Game</div>`:
 			html`<div class="error">This name is already in use</div>`;
 
 		return html`
 			<div class="container" @keydown=${this.keyPress}>
-        <input id="user" type="text"  placeholder="ur name" autofocus>
+        <input id="user" type="text" placeholder="ur name" autofocus>
 				${buttonOrError}
 			</div>
 		`;

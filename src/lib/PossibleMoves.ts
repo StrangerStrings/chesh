@@ -1,11 +1,12 @@
 import { Board, ISquare } from "./Board";
+import { checkSquare, Scalar, straightLineMover, Vector } from "./PossibleMovesUtils";
 export type Position = {x: number; y: number}
 
 export const bishopMoves = (square: ISquare, board: Board): Position[] => {
-  const vectors: Vectors = []
+  const vectors: Vector[] = []
   for (let x=-1; x<=1; x+=2) {
     for (let y=-1; y<=1; y+=2) {
-      vectors.push({x: x as Vector, y: y as Vector})
+      vectors.push({x: x as Scalar, y: y as Scalar})
     }
   }
 
@@ -13,20 +14,20 @@ export const bishopMoves = (square: ISquare, board: Board): Position[] => {
 }
 
 export const castleMoves = (square: ISquare, board: Board): Position[] => {
-  const vectors: Vectors = []
+  const vectors: Vector[] = []
   for (let i=-1; i<=1; i+=2) {
-    vectors.push({x: i as Vector, y: 0})
-    vectors.push({x: 0, y: i as Vector})
+    vectors.push({x: i as Scalar, y: 0})
+    vectors.push({x: 0, y: i as Scalar})
   }
 
   return straightLineMover(vectors, square, board)
 }
 
 export const queenMoves = (square: ISquare, board: Board): Position[] => {
-  const vectors: Vectors = []
+  const vectors: Vector[] = []
   for (let x=-1; x<=1; x++) {
     for (let y=-1; y<=1; y++) {
-      vectors.push({x: x as Vector, y: y as Vector})
+      vectors.push({x: x as Scalar, y: y as Scalar})
     }
   }
 
@@ -77,56 +78,13 @@ export const kingMoves = (square: ISquare, board: Board): Position[] => {
     }
   }
 
+  // if (kingCastlable(square, board))
+
   return moves;
 }
-
-type Vector = -1|0|1
-type Vectors = {x: Vector, y: Vector}[]
-const straightLineMover = 
-  (vectors: Vectors, square: ISquare, board: Board): Position[] => {
-    const moves: Position[] = [];
-
-    vectors.forEach(vector => {
-      for (let distance=1; distance<=board.largestDimension; distance++) {
-        const x = square.x + (vector.x * distance);
-        const y = square.y + (vector.y * distance);
-
-        const moveTo = board.tryGetSquare(x, y);
-        
-        const status = checkSquare(square, moveTo);
-        if (status.enemy || status.emptySquare) {
-          moves.push({x: moveTo.x, y: moveTo.y})
-        }
-        const blocked = status.outOfBounds || status.friend || status.enemy
-        if (blocked) {
-          return;
-        }
-      }
-    })
-
-    return moves;
-}
-
-type CheckStatus = {
-  outOfBounds: boolean;
-  friend: boolean;
-  enemy: boolean;
-  emptySquare: boolean;
-}
-const checkSquare = 
-  (moveFrom: ISquare, moveTo: ISquare|undefined): CheckStatus => {
-    const outOfBounds = !moveTo;
-    if (outOfBounds) {
-      return {outOfBounds, friend: false, enemy: false, emptySquare: false};
-    }
-    const friend = moveTo.piece && moveTo.color == moveFrom.color;
-    const enemy = moveTo.piece && moveTo.color != moveFrom.color;
-    const emptySquare = !moveTo.piece;
-
-    return {
-      outOfBounds, friend, enemy, emptySquare
-    };
-}
+// const kingCastlable = (square: ISquare, board: Board): boolean => {
+//   const whiteStart
+// }
 
 export const pawnMoves = (square: ISquare, board: Board, onlyAttacks?: boolean): Position[] => {
   const moves = []

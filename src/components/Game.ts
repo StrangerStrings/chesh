@@ -7,14 +7,6 @@ import { Position } from "../lib/PossibleMoves";
 import { Square } from "./Square";
 import { setupBoard } from "../lib/BoardSetup";
 
-
-const centreSquare = (board: ISquare[]): ISquare => {
-	return board.find(sq => 
-		sq.x == 4 && sq.y == 4	
-	)
-}
-
-
 /**
  * Just one configurable component for use and reuse
  */
@@ -23,17 +15,15 @@ export class Game extends LitElement{
 	static styles = [
 		defaultStyles,
 		css`
-			.board {
+			.chessBoard {
 				height: 100%;
 				width: 100%;
 				display: flex;
 				flex-direction: column;
-				border: solid 2vh #ffbab3;
-				border: solid 12px #bc6fb1;
 				border: solid 12px #f599a6;
 				transition: transform 0.18s ease-in
 			}
-			.board.rotated {
+			.chessBoard.rotated {
 				transform: rotate(180deg);
 			}
 			.row {
@@ -50,13 +40,12 @@ export class Game extends LitElement{
 	@property({type: String}) color: Color;
 	@property({type: String}) turn: Color;
 
-	@internalProperty() board: Board;
-	// @internalProperty() turn: Color = 'white';
+	@internalProperty() board: Board = new Board();
 	@internalProperty() pieceSelected: boolean = false;
 
 	protected updated(change: Map<string | number | symbol, unknown>): void {
 		if (change.has('boardData')) {
-			this.board = new Board(this.boardData, this.turn)
+			this.board.update(this.boardData, this.turn);
 			this.requestUpdate();
 		}
 	}
@@ -101,9 +90,6 @@ export class Game extends LitElement{
 			(square.color == this.board.lost ? true : false)
 			: undefined;
 
-			console.log(this.board.lost);
-			
-
 		return html`
 			<a-square 
 				@startMove=${this.onStartMove}
@@ -123,7 +109,7 @@ export class Game extends LitElement{
 	}
 	
 	render() {
-		if (!this.board) {
+		if (!this.board || !this.board.squares.length) {
 			return;
 		}
 
@@ -132,7 +118,7 @@ export class Game extends LitElement{
 			this.pieceSelected = true
 		}
 		
-		const board = [];
+		const squares = [];
 		for (let y=8; y>=1; y--) {
 			const row = [];
 			for (let x=1; x<=8; x++) {
@@ -140,19 +126,19 @@ export class Game extends LitElement{
 				row.push(square);
 			}
 
-			board.push(
+			squares.push(
 				html`<div class="row">${row}</div>`
 			);
 		}
 
 		const boardClasses = {
-			board: true,
+			chessBoard: true,
 			rotated: this.color == 'black'
 		}
 		
 		return html`
 			<div class=${classMap(boardClasses)}>
-				${board}
+				${squares}
 			</div>
 		`;
 	}

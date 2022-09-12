@@ -15,17 +15,17 @@ export interface ISquare {
 }
 
 export class Board {
-  constructor(squares: ISquare[], turn: Color) {
-    this.squares = squares,
-    this.turn = turn
-  }
-  
   squares: ISquare[] = []
+  turn: Color = "white"
+  lost?: Color;
+
   height: number = 8;
   width: number = 8;
 
-  turn: Color = "white"
-  lost?: Color;
+  update(squares: ISquare[], turn: Color) {
+    this.squares = squares,
+    this.turn = turn
+  }
 
   get largestDimension() { 
     return Math.max(this.height, this.width); 
@@ -53,12 +53,11 @@ export class Board {
 
   startMove(x:number, y:number) {
 		const selected = this.currentlySelected();
+    this.resetState();
+
     if (x == selected?.x && y == selected?.y) {
-      this.resetState();
       return;
     }
-
-    this.resetState()
 
 		const piece = this.getSquare(x, y);
     if (piece.piece == undefined) {
@@ -67,14 +66,16 @@ export class Board {
 
 		const moves = this.possibleMoves(piece);
 
+    if (moves.length == 0) {
+      return;
+    }
+
 		moves.forEach(move => {
 			const square = this.getSquare(move.x, move.y);
 			square.canMoveHere = true;
 		});
 
-    if (moves.length) {
-		  piece.currentlySelected = true;
-    }
+    piece.currentlySelected = true;
   }
 
   moveHere(x:number, y:number): boolean {
@@ -91,6 +92,8 @@ export class Board {
 		moveFrom.piece = undefined;
 		moveFrom.color = undefined ;
 
+
+    // check stuff for moving player
     if (this.isInCheck(colorMoving)) {
       // reverse move
       moveFrom.piece = moveTo.piece;
@@ -106,12 +109,13 @@ export class Board {
       moveTo.piece = 'queen'
     }
     
+    // check stuff for other player
     const otherColor = this.oppisiteColor(colorMoving)
     if (this.isInCheck(otherColor)) {
       const king = this.getKing(otherColor);
-      king.isInCheck = true
+      king.isInCheck = true;
+
       if (this.isInCheckM8(otherColor)) {
-        // do some check m8y stuff
         console.log('checkm8!');
         this.checkM8(otherColor)
       }
@@ -127,21 +131,19 @@ export class Board {
 
     const enemyPieces = this.squares.filter(sq => sq.piece && sq.color != color);
     
-    const allEnemiesMoves = []
+    const allEnemiesMoves = [];
     enemyPieces.forEach(sq => {
-      allEnemiesMoves.push(...this.possibleMoves(sq, true))
+      allEnemiesMoves.push(...this.possibleMoves(sq, true));
     });
         
-    if (allEnemiesMoves.some(i => i.x == king.x && i.y == king.y)) {
-      return true;
-    }
-    return false
+    const someCanAttackKing = allEnemiesMoves.some(i => i.x == king.x && i.y == king.y);
+    return someCanAttackKing;
   }
 
   isInCheckM8(color: Color): boolean {
     let couldBeCheckM8 = true;
 
-    // can king move anywhere?
+    // can king move anywhere to escape?
     const king = this.getKing(color)
     const kingMoves = this.possibleMoves(king);
     kingMoves.forEach(({x, y}) => {
@@ -176,8 +178,6 @@ export class Board {
   }
 
   movePieceAndCheckForCheck(moveFrom: ISquare, moveToPos: possible.Position): boolean {
-    console.count('checking');
-      
     const moveTo = this.getSquare(moveToPos.x, moveToPos.y)
 
     const moveToColor = moveTo.color

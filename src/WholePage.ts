@@ -9,9 +9,8 @@ import './components/Restart';
 
 import * as fs from 'firebase/firestore';// Import the functions you need from the SDKs you need
 import * as fb from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 import { DocumentData, DocumentReference, Unsubscribe } from "firebase/firestore";
-import { Board, Color, ISquare } from "./lib/Board";
+import { Color, ISquare } from "./lib/Board";
 import { firebaseConfig } from "./firebaseConfig";
 import { setupBoard } from "./lib/BoardSetup";
 import { Game } from "./components/Game";
@@ -21,7 +20,7 @@ import { Form } from "./components/Start";
 
 //firestore collections
 const users = "users"
-const boards = "boards"
+const games = "games"
 //firestore documents
 const active = "activeUsers"
 
@@ -30,6 +29,12 @@ export type User = {
 	lastOnline: number;
 	challenging?: string;
 	playing: boolean;
+}
+
+type GameJson = {
+	board: string; //cause it's stringified
+	turn: Color;
+	lost?: Color;
 }
 
 const refreshRate = 1000 * 20
@@ -51,7 +56,6 @@ export class WholePage extends LitElement {
 				justify-content: center;
 				align-items: center;
 				background: #ffd7b9;
-				/* background: #ffbeb8; */
 			}
 
 			the-game {
@@ -94,8 +98,8 @@ export class WholePage extends LitElement {
 	async connectedCallback() {
 		super.connectedCallback();
 
-		const app = fb.initializeApp(firebaseConfig);
-		this.db = fs.getFirestore(app);
+		const firebaseApp = fb.initializeApp(firebaseConfig);
+		this.db = fs.getFirestore(firebaseApp);
 
 		this.activeUsersDoc = fs.doc(this.db, users, active)
 	}
@@ -120,11 +124,10 @@ export class WholePage extends LitElement {
 			playing: false
 		};
 
-		const plusNewUser = [...activeUsers, user];
+		this.activeUsers = [...activeUsers, user];
 		
-		fs.setDoc(this.activeUsersDoc, {all: plusNewUser})
+		fs.setDoc(this.activeUsersDoc, {all: this.activeUsers})
 		
-		this.activeUsers = plusNewUser;
 		this.currentUser = user;
 		this.lobby = true;
 
@@ -143,12 +146,11 @@ export class WholePage extends LitElement {
 
 
 	async removeInactiveUsers() {
-		const activeUsersDocDoc = await fs.getDoc(this.activeUsersDoc);
+		let activeUsers = (await fs.getDoc(this.activeUsersDoc)).data().all as User[];
 
 		this.currentUser.lastOnline = Date.now();
 
 		// remove current user, re-add with updated .lastOnline and sort alphabetically
-		let activeUsers = activeUsersDocDoc.data().all as User[];
 		activeUsers = activeUsers.filter(u => u.name !== this.currentUser.name);
 
 		activeUsers.push(this.currentUser);
@@ -158,15 +160,15 @@ export class WholePage extends LitElement {
 		});
 
 		// filter out user who were last online too long ago and set firebase document
-		const onlineUsers = activeUsers.filter(user => {
+		activeUsers = activeUsers.filter(user => {
 			const inactiveDeadline = Date.now() - refreshRate * 2;
 			return user.lastOnline > inactiveDeadline;
 		})
 
-		this.activeUsers = onlineUsers
-		fs.setDoc(this.activeUsersDoc, {all: onlineUsers})
+		this.activeUsers = activeUsers
+		fs.setDoc(this.activeUsersDoc, {all: this.activeUsers})
 
-		console.log(onlineUsers);
+		console.log(this.activeUsers);
 	}
 
 
@@ -178,21 +180,20 @@ export class WholePage extends LitElement {
 		fs.setDoc(this.activeUsersDoc, {all: this.activeUsers})
 	}
 
-
-
 	// new game stuff
 	async tryCreateGame() {
 		if (!this.currentUser.challenging) {
 			return;
 		}
-
 		const challengers = this.activeUsers.filter(u => u.challenging == this.currentUser.name);
 
 		for (let i=0; i<challengers.length; i++) {
 			const challenger = challengers[i];
+
 			const areChallengingEachOther = 
 					challenger.challenging == this.currentUser.name 
 					&& this.currentUser.challenging == challenger.name;
+
 			if (areChallengingEachOther) {
 				this.gameOn(challenger)
 				return;
@@ -202,8 +203,8 @@ export class WholePage extends LitElement {
 	
 	async gameOn(challenger: User) {
 		// garbage collect old games
-		const allBoards = await fs.getDocs(fs.collection(this.db, 'boards'));
-		allBoards.forEach(board => {
+		const allGames = await fs.getDocs(fs.collection(this.db, 'boards'));
+		allGames.forEach(game => {
 			// try do something where i compare the two arrays
 			// to check if one contains all the other
 			// eg a.every(i => b.includes(i))
@@ -212,24 +213,23 @@ export class WholePage extends LitElement {
 
 			let userNamesInBoardId = 0;
 			this.activeUsers.forEach((user) => {
-				if (board.id.includes(user.name)) {
+				if (game.id.includes(user.name)) {
 					userNamesInBoardId++;
 				}
 			});
 
 			if (userNamesInBoardId < 2) {
-				const document = fs.doc(this.db, boards, board.id)
-				fs.deleteDoc(document)
+				const gameDoc = fs.doc(this.db, games, game.id)
+				fs.deleteDoc(gameDoc)
 			}
 		});
-
 
 
 		const gameName = this.computeGameName([this.currentUser.name, challenger.name]);
 		this.color = gameName.startsWith(this.currentUser.name) ? 'white' : 'black'
 		console.log('theres a game on! ',gameName, ' ', this.color);
 
-		this.game = fs.doc(this.db, boards, gameName);
+		this.game = fs.doc(this.db, games, gameName);
 		const gameDoc = await fs.getDoc(this.game);
 		
 		if (!gameDoc.data()) {
@@ -272,25 +272,22 @@ export class WholePage extends LitElement {
 
 
 	async pieceMoved() {
-		const board = this.shadowRoot.querySelector<Game>('the-game').board;
+		const game = this.shadowRoot.querySelector<Game>('the-game').board;
 		
-		console.log(board.lost);
-		if (board.lost) {
-			
-			this.lost = board.lost
+		if (game.lost) {
+			this.lost = game.lost
 			console.log(this.lost);
-			
 		}
 
-		const game = {
-			board: JSON.stringify(board.squares),
-			turn: board.turn
+		const gameJson: GameJson = {
+			board: JSON.stringify(game.squares),
+			turn: game.turn
 		}
-		if (board.lost) {
-			game['lost'] = board.lost
+		if (game.lost) {
+			gameJson.lost = game.lost;
 		}
 
-		fs.setDoc(this.game, game);
+		fs.setDoc(this.game, gameJson);
 	}
 
 	async restart() {
@@ -303,9 +300,8 @@ export class WholePage extends LitElement {
 		delete this.currentUser.challenging;
 		this.currentUser.playing = false;
 
-		const activeUsersDocDoc = await fs.getDoc(this.activeUsersDoc);
+		let activeUsers = (await fs.getDoc(this.activeUsersDoc)).data().all as User[];
 
-		let activeUsers = activeUsersDocDoc.data().all as User[];
 		activeUsers = activeUsers.filter(u => u.name !== this.currentUser.name);
 
 		activeUsers.push(this.currentUser);
@@ -328,6 +324,7 @@ export class WholePage extends LitElement {
 			this.tryCreateGame();
 		});
 	}
+
 
 	renderContent(): TemplateResult {
 		if (this.playing) {
